@@ -1,14 +1,14 @@
--- Midnight Energy Bar Addon - Enhanced Version
 local addonName = "TalentChecker"
+local msgFrame = nil
+local dropdown = nil
 
 -- Initialize saved variables
-TalentChecker = TalentChecker or {
-    
+TalentCheckerDB = TalentCheckerDB or {
+    checkInParty = true,
+    checkInRaid = true,
+    partyKeyword = "party",
+    raidKeyword = "raid"
 }
-
-local buttons = {}
-local msgFrame = CreateFrame("FRAME", nil, UIParent, "BackdropTemplate")
-local dropdown = CreateFrame("Frame", "MyDropdown", msgFrame, "UIDropDownMenuTemplate")
 
 function UpdateTalentButtons()
     local configs = C_ClassTalents.GetConfigIDsBySpecID()
@@ -32,7 +32,7 @@ function UpdateTalentButtons()
     end)
 end
 
-function UpdateTalentText(frame, label, name, show)
+local function UpdateTalentText(frame, label, name, show)
     if show then
         frame:Show()
     else
@@ -45,81 +45,133 @@ function UpdateTalentText(frame, label, name, show)
     label:SetText(text)
 
     -- Auto-adjust frame width based on text size
-    local padding = 20 -- space on left/right
+    local padding = 20
     local textWidth = label:GetStringWidth()
     frame:SetWidth(textWidth + padding)
 
     UpdateTalentButtons()
 end
 
-function CheckTalents(frame)
-    local sid = PlayerUtil.GetCurrentSpecID();
-    --print("SpecID: " .. tostring(sid))
-    
-    local lastSelected = C_ClassTalents.GetLastSelectedSavedConfigID(sid);
-    --print("Selected: " .. tostring(lastSelected))
-    
+local function ShouldCheckTalents(instanceType)
+    if instanceType == "party" then
+        return TalentCheckerDB.checkInParty
+    elseif instanceType == "raid" then
+        return TalentCheckerDB.checkInRaid
+    end
+    return false
+end
+
+local function GetSearchKeyword(instanceType)
+    if instanceType == "party" then
+        return TalentCheckerDB.partyKeyword
+    elseif instanceType == "raid" then
+        return TalentCheckerDB.raidKeyword
+    end
+    return instanceType
+end
+
+local function CheckTalents(frame)
+    local sid = PlayerUtil.GetCurrentSpecID()
+    local lastSelected = C_ClassTalents.GetLastSelectedSavedConfigID(sid)
     local info = C_Traits.GetConfigInfo(lastSelected)
-    --print("Name: " .. info.name)
-    
     local _, instanceType = IsInInstance()
-    --print("Instance: " .. instanceType)
-    
-    local talents_relevant = instanceType == "party" or instanceType == "raid"
-    --print("Relevant: " .. tostring(talents_relevant))
-    
-    local found = string.find(string.lower(info.name), instanceType) ~= nil    
-    --print("Found: " .. tostring(found))
-    
+
+    local talents_relevant = ShouldCheckTalents(instanceType)
+    local searchKeyword = GetSearchKeyword(instanceType)
+    local found = string.find(string.lower(info.name), string.lower(searchKeyword)) ~= nil
     local show = talents_relevant and not found
-    --print("Show: " .. tostring(show))
 
     UpdateTalentText(frame, frame.text, info.name, show)
 end
 
--- Create UI Elements
--- Background
-msgFrame:SetWidth(200)
-msgFrame:SetHeight(50)
-msgFrame:SetPoint("CENTER")
-msgFrame:SetFrameStrata("TOOLTIP")
-msgFrame:SetBackdrop({
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = nil,
-    tile = true, tileSize = 16, edgeSize = 16,
-})
-msgFrame:SetBackdropColor(0, 0, 0, 0.7)
--- Text Field
-msgFrame.text = msgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-msgFrame.text:SetPoint("CENTER")
-msgFrame.text:SetText("Hello World")
-msgFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 24, "OUTLINE")
+local function InitializeFrame()
+    msgFrame = CreateFrame("FRAME", nil, UIParent, "BackdropTemplate")
+    msgFrame:SetWidth(200)
+    msgFrame:SetHeight(50)
+    msgFrame:SetPoint("CENTER")
+    msgFrame:SetFrameStrata("TOOLTIP")
+    msgFrame:SetBackdrop({
+        bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile = nil,
+        tile = true, tileSize = 16, edgeSize = 16,
+    })
+    msgFrame:SetBackdropColor(0, 0, 0, 0.7)
 
-dropdown:SetPoint("TOP", msgFrame.text, "BOTTOM", 0, -5)  -- below the label
+    msgFrame.text = msgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    msgFrame.text:SetPoint("CENTER")
+    msgFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 24, "OUTLINE")
 
--- Register Events
-msgFrame:RegisterEvent("PLAYER_ENTERING_WORLD") -- Enter Key/Raid
-msgFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")  -- Change Talent
-msgFrame:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter Combat
-msgFrame:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Exit Combat
+    dropdown = CreateFrame("Frame", "MyDropdown", msgFrame, "UIDropDownMenuTemplate")
+    dropdown:SetPoint("TOP", msgFrame.text, "BOTTOM", 0, -5)
 
-msgFrame:SetScript("OnEvent", function(self, event, ...)
-	if event == "PLAYER_ENTERING_WORLD" then
-		-- print("PLAYER_ENTERING_WORLD")
-        CheckTalents(msgFrame)
-	elseif event == "TRAIT_CONFIG_UPDATED" then
-		-- print("TRAIT_CONFIG_UPDATED")
-        -- CheckTalents(msgFrame)
-        C_Timer.After(3, function() CheckTalents(msgFrame) end)
-    elseif event == "PLAYER_REGEN_DISABLED" then
-        -- print("PLAYER_REGEN_DISABLED")
-        -- Hide Addon in Combat
-        msgFrame:Hide()
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        -- print("PLAYER_REGEN_ENABLED")
-        -- Show outside of combat only if needed
-        CheckTalents(msgFrame)
-	end
+    -- Hide frame initially
+    msgFrame:Hide()
+
+    msgFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    msgFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
+    msgFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+    msgFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+
+    msgFrame:SetScript("OnEvent", function(self, event, ...)
+        if event == "PLAYER_ENTERING_WORLD" then
+            CheckTalents(msgFrame)
+        elseif event == "TRAIT_CONFIG_UPDATED" then
+            -- CheckTalents(msgFrame)
+            C_Timer.After(3, function() CheckTalents(msgFrame) end)
+        elseif event == "PLAYER_REGEN_DISABLED" then
+            -- Hide Addon in Combat
+            msgFrame:Hide()
+        elseif event == "PLAYER_REGEN_ENABLED" then
+            -- Show outside of combat only if needed
+            CheckTalents(msgFrame)
+        end
+    end)
+
+    return msgFrame
+end
+
+-- Initialize on PLAYER_LOGIN
+local frame = CreateFrame("FRAME")
+frame:RegisterEvent("PLAYER_LOGIN")
+frame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_LOGIN" then
+        InitializeFrame()
+    end
 end)
 
+-- Slash Commands
+SLASH_TALENTCHECKER1 = "/tc"
+SLASH_TALENTCHECKER2 = "/talentchecker"
+SlashCmdList["TALENTCHECKER"] = function(msg)
+    if not msgFrame then
+        print("TalentChecker: Frame not initialized!")
+        return
+    end
 
+    local cmd, value = string.match(msg, "^(%S+)%s*(.-)$")
+    cmd = string.lower(cmd or "")
+    
+    if cmd == "party" and value == "" then
+        TalentCheckerDB.checkInParty = not TalentCheckerDB.checkInParty
+        print("TalentChecker: Party-check " .. (TalentCheckerDB.checkInParty and "active" or "inactive"))
+    elseif cmd == "raid" and value == "" then
+        TalentCheckerDB.checkInRaid = not TalentCheckerDB.checkInRaid
+        print("TalentChecker: Raid-check " .. (TalentCheckerDB.checkInRaid and "active" or "inactive"))
+    elseif cmd == "setparty" and value ~= "" then
+        TalentCheckerDB.partyKeyword = value
+        print("TalentChecker: Party-check keyword set to'" .. value .. "'")
+    elseif cmd == "setraid" and value ~= "" then
+        TalentCheckerDB.raidKeyword = value
+        print("TalentChecker: Raid--check keyword set to'" .. value .. "'")
+    else
+        print("TalentChecker Commands:")
+        print("/tc party - Toggle dungeon/m+ check")
+        print("/tc raid - Toggle raid check")
+        print("/tc setparty <text> - Set party-check keyword")
+        print("/tc setraid <text> - Set raid-check keyword")
+        print("Current Kewords:")
+        print("Party: " .. TalentCheckerDB.partyKeyword)
+        print("Raid: " .. TalentCheckerDB.raidKeyword)
+    end
+    CheckTalents(msgFrame)
+end
