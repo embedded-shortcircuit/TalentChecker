@@ -1,5 +1,6 @@
 local addonName = "TalentChecker"
 local msgFrame = nil
+local dropdown = nil
 
 -- Initialize saved variables
 TalentCheckerDB = TalentCheckerDB or {
@@ -8,6 +9,28 @@ TalentCheckerDB = TalentCheckerDB or {
     partyKeyword = "party",
     raidKeyword = "raid"
 }
+
+function UpdateTalentButtons()
+    local configs = C_ClassTalents.GetConfigIDsBySpecID()
+
+    -- Populate dropdown
+    UIDropDownMenu_SetWidth(dropdown, 120)
+    UIDropDownMenu_SetText(dropdown, "Change Talent")
+    UIDropDownMenu_Initialize(dropdown, function(self, level)
+        for index, configID in ipairs(configs) do
+            local info = C_Traits.GetConfigInfo(configID)
+            if info then
+                local entry = UIDropDownMenu_CreateInfo()
+                entry.text = info.name
+                entry.value = index
+                entry.func = function()
+                    ClassTalentHelper.SwitchToLoadoutByIndex(index)
+                end
+                UIDropDownMenu_AddButton(entry)
+            end
+        end  
+    end)
+end
 
 local function UpdateTalentText(frame, label, name, show)
     if show then
@@ -25,6 +48,8 @@ local function UpdateTalentText(frame, label, name, show)
     local padding = 20
     local textWidth = label:GetStringWidth()
     frame:SetWidth(textWidth + padding)
+
+    UpdateTalentButtons()
 end
 
 local function ShouldCheckTalents(instanceType)
@@ -86,6 +111,9 @@ local function InitializeFrame()
     msgFrame.text:SetPoint("CENTER")
     msgFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 24, "OUTLINE")
 
+    dropdown = CreateFrame("Frame", "MyDropdown", msgFrame, "UIDropDownMenuTemplate")
+    dropdown:SetPoint("TOP", msgFrame.text, "BOTTOM", 0, -5)
+
     -- Hide frame initially
     msgFrame:Hide()
 
@@ -98,7 +126,7 @@ local function InitializeFrame()
         if event == "PLAYER_ENTERING_WORLD" then
             CheckTalents(self)
         elseif event == "TRAIT_CONFIG_UPDATED" then
-            CheckTalents(self)
+            C_Timer.After(3, function() CheckTalents(msgFrame) end)
         elseif event == "PLAYER_REGEN_DISABLED" then
             self:Hide()
         elseif event == "PLAYER_REGEN_ENABLED" then
