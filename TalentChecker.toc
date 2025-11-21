@@ -2,8 +2,8 @@
 ## Title: Midnight TalentChecker
 ## Notes: Show a warning if the incorrect Talents for Raid/Dungeons are selected
 ## Author: Me
-## Version: 0.0.1
-## SavedVariables: TalentChecker
+## Version: 0.0.2
+## SavedVariables: TalentCheckerDB
 ## X-Category: Talents
 ## X-Curse-Project-ID: 
 ## X-WoWI-ID:
