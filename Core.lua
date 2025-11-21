@@ -5,7 +5,7 @@ local msgFrame = nil
 TalentCheckerDB = TalentCheckerDB or {
     checkInParty = true,
     checkInRaid = true,
-    partyKeyword = "m+",
+    partyKeyword = "party",
     raidKeyword = "raid"
 }
 
