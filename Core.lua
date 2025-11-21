@@ -6,6 +6,32 @@ TalentChecker = TalentChecker or {
     
 }
 
+local buttons = {}
+local msgFrame = CreateFrame("FRAME", nil, UIParent, "BackdropTemplate")
+local dropdown = CreateFrame("Frame", "MyDropdown", msgFrame, "UIDropDownMenuTemplate")
+
+function UpdateTalentButtons()
+    local configs = C_ClassTalents.GetConfigIDsBySpecID()
+
+    -- Populate dropdown
+    UIDropDownMenu_SetWidth(dropdown, 120)
+    UIDropDownMenu_SetText(dropdown, "Change Talent")
+    UIDropDownMenu_Initialize(dropdown, function(self, level)
+        for index, configID in ipairs(configs) do
+            local info = C_Traits.GetConfigInfo(configID)
+            if info then
+                local entry = UIDropDownMenu_CreateInfo()
+                entry.text = info.name
+                entry.value = index
+                entry.func = function()
+                    ClassTalentHelper.SwitchToLoadoutByIndex(index)
+                end
+                UIDropDownMenu_AddButton(entry)
+            end
+        end  
+    end)
+end
+
 function UpdateTalentText(frame, label, name, show)
     if show then
         frame:Show()
@@ -22,6 +48,8 @@ function UpdateTalentText(frame, label, name, show)
     local padding = 20 -- space on left/right
     local textWidth = label:GetStringWidth()
     frame:SetWidth(textWidth + padding)
+
+    UpdateTalentButtons()
 end
 
 function CheckTalents(frame)
@@ -51,7 +79,6 @@ end
 
 -- Create UI Elements
 -- Background
-local msgFrame = CreateFrame("FRAME", nil, UIParent, "BackdropTemplate")
 msgFrame:SetWidth(200)
 msgFrame:SetHeight(50)
 msgFrame:SetPoint("CENTER")
@@ -68,6 +95,8 @@ msgFrame.text:SetPoint("CENTER")
 msgFrame.text:SetText("Hello World")
 msgFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 24, "OUTLINE")
 
+dropdown:SetPoint("TOP", msgFrame.text, "BOTTOM", 0, -5)  -- below the label
+
 -- Register Events
 msgFrame:RegisterEvent("PLAYER_ENTERING_WORLD") -- Enter Key/Raid
 msgFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")  -- Change Talent
@@ -80,7 +109,8 @@ msgFrame:SetScript("OnEvent", function(self, event, ...)
         CheckTalents(msgFrame)
 	elseif event == "TRAIT_CONFIG_UPDATED" then
 		-- print("TRAIT_CONFIG_UPDATED")
-        CheckTalents(msgFrame)
+        -- CheckTalents(msgFrame)
+        C_Timer.After(3, function() CheckTalents(msgFrame) end)
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- print("PLAYER_REGEN_DISABLED")
         -- Hide Addon in Combat
@@ -91,4 +121,5 @@ msgFrame:SetScript("OnEvent", function(self, event, ...)
         CheckTalents(msgFrame)
 	end
 end)
+
 
