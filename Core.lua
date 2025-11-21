@@ -1,6 +1,5 @@
 local addonName = "TalentChecker"
 local msgFrame = nil
-local dropdown = nil
 
 -- Initialize saved variables
 TalentCheckerDB = TalentCheckerDB or {
@@ -9,28 +8,6 @@ TalentCheckerDB = TalentCheckerDB or {
     partyKeyword = "party",
     raidKeyword = "raid"
 }
-
-function UpdateTalentButtons()
-    local configs = C_ClassTalents.GetConfigIDsBySpecID()
-
-    -- Populate dropdown
-    UIDropDownMenu_SetWidth(dropdown, 120)
-    UIDropDownMenu_SetText(dropdown, "Change Talent")
-    UIDropDownMenu_Initialize(dropdown, function(self, level)
-        for index, configID in ipairs(configs) do
-            local info = C_Traits.GetConfigInfo(configID)
-            if info then
-                local entry = UIDropDownMenu_CreateInfo()
-                entry.text = info.name
-                entry.value = index
-                entry.func = function()
-                    ClassTalentHelper.SwitchToLoadoutByIndex(index)
-                end
-                UIDropDownMenu_AddButton(entry)
-            end
-        end  
-    end)
-end
 
 local function UpdateTalentText(frame, label, name, show)
     if show then
@@ -48,8 +25,6 @@ local function UpdateTalentText(frame, label, name, show)
     local padding = 20
     local textWidth = label:GetStringWidth()
     frame:SetWidth(textWidth + padding)
-
-    UpdateTalentButtons()
 end
 
 local function ShouldCheckTalents(instanceType)
@@ -73,7 +48,17 @@ end
 local function CheckTalents(frame)
     local sid = PlayerUtil.GetCurrentSpecID()
     local lastSelected = C_ClassTalents.GetLastSelectedSavedConfigID(sid)
+    if not lastSelected then
+        frame:Hide()
+        return
+    end
+
     local info = C_Traits.GetConfigInfo(lastSelected)
+    if not info then
+        frame:Hide()
+        return
+    end
+
     local _, instanceType = IsInInstance()
 
     local talents_relevant = ShouldCheckTalents(instanceType)
@@ -101,9 +86,6 @@ local function InitializeFrame()
     msgFrame.text:SetPoint("CENTER")
     msgFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 24, "OUTLINE")
 
-    dropdown = CreateFrame("Frame", "MyDropdown", msgFrame, "UIDropDownMenuTemplate")
-    dropdown:SetPoint("TOP", msgFrame.text, "BOTTOM", 0, -5)
-
     -- Hide frame initially
     msgFrame:Hide()
 
@@ -114,16 +96,13 @@ local function InitializeFrame()
 
     msgFrame:SetScript("OnEvent", function(self, event, ...)
         if event == "PLAYER_ENTERING_WORLD" then
-            CheckTalents(msgFrame)
+            CheckTalents(self)
         elseif event == "TRAIT_CONFIG_UPDATED" then
-            -- CheckTalents(msgFrame)
-            C_Timer.After(3, function() CheckTalents(msgFrame) end)
+            CheckTalents(self)
         elseif event == "PLAYER_REGEN_DISABLED" then
-            -- Hide Addon in Combat
-            msgFrame:Hide()
+            self:Hide()
         elseif event == "PLAYER_REGEN_ENABLED" then
-            -- Show outside of combat only if needed
-            CheckTalents(msgFrame)
+            CheckTalents(self)
         end
     end)
 
@@ -150,7 +129,6 @@ SlashCmdList["TALENTCHECKER"] = function(msg)
 
     local cmd, value = string.match(msg, "^(%S+)%s*(.-)$")
     cmd = string.lower(cmd or "")
-    
     if cmd == "party" and value == "" then
         TalentCheckerDB.checkInParty = not TalentCheckerDB.checkInParty
         print("TalentChecker: Party-check " .. (TalentCheckerDB.checkInParty and "active" or "inactive"))
